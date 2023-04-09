@@ -1,26 +1,23 @@
+package utility;
+
 import java.io.*;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
-import java.net.SocketAddress;
-import java.util.List;
-
-import static java.util.Map.Entry;
+import java.net.InetSocketAddress;
+import java.util.Map;
 
 public final class Message implements Serializable {
-    public enum MessageType {
-        JOIN, UPDATE, RESPONSE
-    }
 
     private final String routerID;
 
-    private SocketAddress address; // srcAddress or destAddress
+    private InetSocketAddress address; // srcAddress if received, or destAddress if sending
 
     private final MessageType type;
 
-    private final List<Entry<String, Integer>> table;
+    private final Map<String, Integer> table;
 
     // format for UPDATE and RESPONSE messages
-    public Message(MessageType type, String routerID, SocketAddress address, List<Entry<String, Integer>> table) {
+    public Message(MessageType type, String routerID, InetSocketAddress address, Map<String, Integer> table) {
         this.type = type;
         this.routerID = routerID;
         this.address = address;
@@ -28,7 +25,7 @@ public final class Message implements Serializable {
     }
 
     // format for JOIN message
-    public Message(MessageType type, String routerID, SocketAddress address) {
+    public Message(MessageType type, String routerID, InetSocketAddress address) {
         this(type, routerID, address, null);
     }
 
@@ -40,15 +37,15 @@ public final class Message implements Serializable {
         return type;
     }
 
-    public List<Entry<String, Integer>> getTable() {
+    public Map<String, Integer> getTable() {
         return table;
     }
 
-    public SocketAddress getAddress() {
+    public InetSocketAddress getAddress() {
         return address;
     }
 
-    public void setAddress(SocketAddress address) {
+    public void setAddress(InetSocketAddress address) {
         this.address = address;
     }
 
@@ -77,7 +74,8 @@ public final class Message implements Serializable {
             System.out.println("error casting class");
             throw new RuntimeException(e);
         }
-
+        // set address of sender
+        msg.setAddress(new InetSocketAddress(packet.getAddress(), packet.getPort()));
         return msg;
     }
 
@@ -104,5 +102,10 @@ public final class Message implements Serializable {
             System.out.println("error sending message");
             throw new RuntimeException(e);
         }
+    }
+
+    @Override
+    public String toString() {
+        return "routerID:" + routerID + " type:" + type + " address:" + address + " table: " + table;
     }
 }
