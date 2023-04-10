@@ -1,25 +1,25 @@
 package node;
 
-import utility.Message;
+import message.Message;
 
 import java.net.*;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static utility.MessageType.*;
+import static message.MessageType.*;
 
 public class AbstractNode {
-    public static final String SERVER_IP = "localhost";
-    public static final int PORT = 5555;
+    public static final String DEFAULT_SERVER_IP = "localhost";
+    public static final int DEFAULT_SERVER_PORT = 5555;
 
     private InetSocketAddress serverAddress;
 
     private final String routerID;
 
     private final DatagramSocket socket;
-    private Map<String, Integer> table;
+    private Map<String, Integer> dvTable;
 
-    private final Map<String, String> nextHop = new HashMap<>();
+    private final Map<String, String> nextHopMap = new HashMap<>();
 
     public AbstractNode(String routerID) {
         this.routerID = routerID;
@@ -34,86 +34,88 @@ public class AbstractNode {
     public void connect(InetSocketAddress serverAddress) {
         this.serverAddress = serverAddress;
         // Send JOIN message
-        Message initMsg = new Message(JOIN, this.routerID, serverAddress);
-        Message.sendMessage(socket, initMsg);
-        // Receive RESPONSE message
-        Message recvMsg = Message.recvMessage(socket);
-        // sanity check
-        if (!recvMsg.getType().equals(RESPONSE)) return;
+        Message joinMessage = new Message(JOIN, this.routerID, serverAddress);
+        Message.sendMessage(socket, joinMessage);
 
-        // init DV table
-        this.table = recvMsg.getTable();
-        // create neighbors table
-        table.forEach((node, weight) -> {
-            nextHop.put(node, null);
+        Message recvMsg = Message.recvMessage(socket);
+        boolean isResponseMessage = recvMsg.getMessageType().equals(RESPONSE);
+        if (!isResponseMessage) return;
+
+        this.dvTable = recvMsg.getDvTable();
+
+        dvTable.forEach((nodeID, weight) -> {
             if (weight < 0) {
-                table.put(node, Integer.MAX_VALUE - 1000); // simulate infinity
+                dvTable.put(nodeID, Integer.MAX_VALUE / 2); // simulate infinity
+                nextHopMap.put(nodeID, null);
             } else {
-                nextHop.put(node, node);
+                nextHopMap.put(nodeID, nodeID);
             }
         });
     }
 
-    public void init() {
-        Message initMessage = new Message(UPDATE, this.routerID, this.serverAddress, this.table);
-        Message.sendMessage(socket, initMessage);
+    public void sendFirstRound() {
+        Message initialUpdateMessage = new Message(UPDATE, this.routerID, this.serverAddress, this.dvTable);
+        Message.sendMessage(socket, initialUpdateMessage);
     }
 
 
     public void update() {
         while (true) {
-            // receive UPDATE
             Message recvMessage = Message.recvMessage(socket);
-            // check UPDATE
-            if (!recvMessage.getType().equals(UPDATE)) continue;
-            // perform UPDATE
+
+            if (recvMessage.isType(TERMINATE)) break;
+            if (!recvMessage.isType(UPDATE)) continue;
+
             String neighborID = recvMessage.getRouterID();
-            Map<String, Integer> recvTable = recvMessage.getTable();
-            AtomicBoolean isChanged = new AtomicBoolean(false);
+            Map<String, Integer> recvTable = recvMessage.getDvTable();
+            AtomicBoolean tableIsChanged = new AtomicBoolean(false);
+
             // Bellman-Ford
-            table.forEach((node, weight) -> {
-                // go directly
-                int oldWeight = table.get(node);
-                // go through the neighbor
-                int newWeight = table.get(neighborID) + recvTable.get(node);
+            dvTable.forEach((nodeID, weight) -> {
+                int oldWeight = dvTable.get(nodeID);
+                int newWeight = dvTable.get(neighborID) + recvTable.get(nodeID);
+
                 if (newWeight < oldWeight) {
-                    isChanged.set(true);
-                    table.put(node, newWeight);
-                    nextHop.put(node, neighborID);
+                    tableIsChanged.set(true);
+                    dvTable.put(nodeID, newWeight);
+                    nextHopMap.put(nodeID, neighborID);
                 }
 
             });
-            // no change
-            if (!isChanged.get()) continue;
 
-            // some change
+            if (!tableIsChanged.get()) continue;
 
             System.out.println(printTable());
 
-            Message sendMsg = new Message(UPDATE, routerID, serverAddress, this.table);
-            Message.sendMessage(socket, sendMsg);
+            Message updateMessage = new Message(UPDATE, routerID, serverAddress, this.dvTable);
+            Message.sendMessage(socket, updateMessage);
         }
+        System.out.println("table finalized");
     }
 
     public String printTable() {
         StringBuilder sb = new StringBuilder();
         sb.append(routerID).append(": ");
-        table.entrySet()
+        dvTable.entrySet()
                 .stream()
                 .sorted(Map.Entry.comparingByKey())
                 .forEach(e -> sb.append(e.getKey())
                         .append("-").append(e.getValue())
-                        .append("-").append(nextHop.get(e.getKey()))
+                        .append("-").append(nextHopMap.get(e.getKey()))
                         .append(" "));
         return sb.toString();
     }
 
-    public void run() throws UnknownHostException {
-        // send JOIN message
-        this.connect(new InetSocketAddress(InetAddress.getByName(SERVER_IP), PORT));
-        // send the first time
-        this.init();
-        // enter loop to UPDATE DV table
+    public void run() {
+        InetSocketAddress serverAddress;
+        try {
+            serverAddress = new InetSocketAddress(InetAddress.getByName(DEFAULT_SERVER_IP), DEFAULT_SERVER_PORT);
+        } catch (UnknownHostException e) {
+            System.out.println("error connecting to <server_ip> or <server_port>");
+            throw new RuntimeException(e);
+        }
+        this.connect(serverAddress);
+        this.sendFirstRound();
         this.update();
     }
 

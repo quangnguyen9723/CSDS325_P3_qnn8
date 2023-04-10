@@ -1,4 +1,4 @@
-package utility;
+package message;
 
 import java.io.*;
 import java.net.DatagramPacket;
@@ -8,37 +8,41 @@ import java.util.Map;
 
 public final class Message implements Serializable {
 
-    private final String routerID;
+    private String routerID; // from a router if UPDATE or JOIN, or to a router if RESPONSE
 
     private InetSocketAddress address; // srcAddress if received, or destAddress if sending
 
-    private final MessageType type;
+    private final MessageType messageType;
 
-    private final Map<String, Integer> table;
+    private final Map<String, Integer> dvTable;
 
     // format for UPDATE and RESPONSE messages
-    public Message(MessageType type, String routerID, InetSocketAddress address, Map<String, Integer> table) {
-        this.type = type;
+    public Message(MessageType messageType, String routerID, InetSocketAddress address, Map<String, Integer> dvTable) {
+        this.messageType = messageType;
         this.routerID = routerID;
         this.address = address;
-        this.table = table;
+        this.dvTable = dvTable;
     }
 
     // format for JOIN message
-    public Message(MessageType type, String routerID, InetSocketAddress address) {
-        this(type, routerID, address, null);
+    public Message(MessageType messageType, String routerID, InetSocketAddress address) {
+        this(messageType, routerID, address, null);
     }
 
     public String getRouterID() {
         return routerID;
     }
 
-    public MessageType getType() {
-        return type;
+    public void setRouterID(String routerID) {
+        this.routerID = routerID;
     }
 
-    public Map<String, Integer> getTable() {
-        return table;
+    public MessageType getMessageType() {
+        return messageType;
+    }
+
+    public Map<String, Integer> getDvTable() {
+        return dvTable;
     }
 
     public InetSocketAddress getAddress() {
@@ -49,24 +53,28 @@ public final class Message implements Serializable {
         this.address = address;
     }
 
+    public boolean isType(MessageType type) {
+        return this.messageType.equals(type);
+    }
+
     public static Message recvMessage(DatagramSocket socket) {
-        // Receive a DatagramPacket
+        // receive a packet
         byte[] buffer = new byte[1024];
-        DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
+        DatagramPacket recvPacket = new DatagramPacket(buffer, buffer.length);
         try {
-            socket.receive(packet);
+            socket.receive(recvPacket);
         } catch (IOException e) {
             System.out.println("error receiving message");
             throw new RuntimeException(e);
         }
 
         // Deserialize the message from the received packet
-        Message msg;
+        Message recvMessage;
         try (
-                ByteArrayInputStream bis = new ByteArrayInputStream(packet.getData());
+                ByteArrayInputStream bis = new ByteArrayInputStream(recvPacket.getData());
                 ObjectInputStream in = new ObjectInputStream(bis)
         ) {
-            msg = (Message) in.readObject();
+            recvMessage = (Message) in.readObject();
         } catch (IOException e) {
             System.out.println("error creating input stream");
             throw new RuntimeException(e);
@@ -75,29 +83,29 @@ public final class Message implements Serializable {
             throw new RuntimeException(e);
         }
         // set address of sender
-        msg.setAddress(new InetSocketAddress(packet.getAddress(), packet.getPort()));
-        return msg;
+        recvMessage.setAddress(new InetSocketAddress(recvPacket.getAddress(), recvPacket.getPort()));
+        return recvMessage;
     }
 
-    public static void sendMessage(DatagramSocket socket, Message msg) {
+    public static void sendMessage(DatagramSocket socket, Message message) {
         // Serialize the object to a byte array
-        byte[] data;
+        byte[] sendData;
         try (
                 ByteArrayOutputStream bos = new ByteArrayOutputStream();
                 ObjectOutputStream out = new ObjectOutputStream(bos)
         ) {
-            out.writeObject(msg);
-            data = bos.toByteArray();
+            out.writeObject(message);
+            sendData = bos.toByteArray();
         } catch (IOException e) {
             System.out.println("error creating output stream or writing object");
             throw new RuntimeException(e);
         }
 
-        DatagramPacket packet = new DatagramPacket(data, data.length, msg.getAddress());
+        DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, message.getAddress());
 
         // Send the DatagramPacket
         try {
-            socket.send(packet);
+            socket.send(sendPacket);
         } catch (IOException e) {
             System.out.println("error sending message");
             throw new RuntimeException(e);
@@ -106,6 +114,7 @@ public final class Message implements Serializable {
 
     @Override
     public String toString() {
-        return "routerID:" + routerID + " type:" + type + " address:" + address + " table: " + table;
+        return "routerID:" + routerID + " type:" + messageType + " address:" + address + " table: " + dvTable;
     }
+
 }

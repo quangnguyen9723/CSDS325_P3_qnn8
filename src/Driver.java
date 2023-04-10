@@ -6,15 +6,11 @@ public class Driver {
 
     public static void start(AbstractNode node) {
         new Thread(() -> {
-            try {
-                node.run();
-            } catch (UnknownHostException e) {
-                throw new RuntimeException(e);
-            }
+            node.run();
         }).start();
     }
 
-    public static void main(String[] args)  {
+    public static void main(String[] args) {
         NodeU u = new NodeU();
         NodeV v = new NodeV();
         NodeW w = new NodeW();
