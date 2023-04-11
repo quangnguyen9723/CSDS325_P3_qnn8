@@ -6,9 +6,12 @@ import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
 import java.util.Map;
 
+/**
+ * An exchangeable message between nodes
+ */
 public final class Message implements Serializable {
 
-    private String routerID; // from a router if UPDATE or JOIN, or to a router if RESPONSE
+    private final String routerID; // source ID if UPDATE or JOIN, or destination ID if RESPONSE
 
     private InetSocketAddress address; // srcAddress if received, or destAddress if sending
 
@@ -16,7 +19,13 @@ public final class Message implements Serializable {
 
     private final Map<String, Integer> dvTable;
 
-    // format for UPDATE and RESPONSE messages
+    /**
+     * Message format for UPDATE and RESPONSE messages
+     * @param messageType type of message
+     * @param routerID source if UPDATE, or destination if RESPONSE
+     * @param address destination address
+     * @param dvTable forwarding dv table
+     */
     public Message(MessageType messageType, String routerID, InetSocketAddress address, Map<String, Integer> dvTable) {
         this.messageType = messageType;
         this.routerID = routerID;
@@ -24,17 +33,18 @@ public final class Message implements Serializable {
         this.dvTable = dvTable;
     }
 
-    // format for JOIN message
+    /**
+     * Message format for JOIN messages
+     * @param messageType type of message
+     * @param routerID source if UPDATE, or destination if RESPONSE
+     * @param address destination address
+     */
     public Message(MessageType messageType, String routerID, InetSocketAddress address) {
         this(messageType, routerID, address, null);
     }
 
     public String getRouterID() {
         return routerID;
-    }
-
-    public void setRouterID(String routerID) {
-        this.routerID = routerID;
     }
 
     public MessageType getMessageType() {
@@ -53,10 +63,16 @@ public final class Message implements Serializable {
         this.address = address;
     }
 
+
     public boolean isType(MessageType type) {
-        return this.messageType.equals(type);
+        return this.messageType != null && this.messageType.equals(type);
     }
 
+    /**
+     * Receive message from a specified socket
+     * @param socket listening socket
+     * @return received message
+     */
     public static Message recvMessage(DatagramSocket socket) {
         // receive a packet
         byte[] buffer = new byte[1024];
@@ -87,6 +103,11 @@ public final class Message implements Serializable {
         return recvMessage;
     }
 
+    /**
+     * Forwards a given message from sending socket
+     * @param socket sending socket
+     * @param message message to forward
+     */
     public static void sendMessage(DatagramSocket socket, Message message) {
         // Serialize the object to a byte array
         byte[] sendData;
@@ -116,5 +137,4 @@ public final class Message implements Serializable {
     public String toString() {
         return "routerID:" + routerID + " type:" + messageType + " address:" + address + " table: " + dvTable;
     }
-
 }

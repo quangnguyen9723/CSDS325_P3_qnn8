@@ -7,14 +7,17 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import static message.MessageType.*;
 
+/**
+ * Server class to handle the registration of nodes and forward the messages
+ */
+
 public class Server {
 
     private static final int DEFAULT_PORT = 5555;
+
     private static final String CONFIG_FILE_PATH = "src/config.txt";
 
     private static final long IDLE_TIME_MILLIS = 3000;
-
-    private volatile boolean isConnected = false;
 
     private final DatagramSocket socket;
 
@@ -24,12 +27,23 @@ public class Server {
 
     private final Map<String, InetSocketAddress> addressMap = new HashMap<>(); // maps from node to its address
 
-    private Server() throws IOException {
-        socket = new DatagramSocket(DEFAULT_PORT);
-        processConfigFile();
+    /**
+     * Initialize a server with default port and process the config file
+     */
+    private Server() {
+        try {
+            socket = new DatagramSocket(DEFAULT_PORT);
+            processConfigFile();
+        } catch (IOException e) {
+            System.out.println("error at default port or reading config.txt");
+            throw new RuntimeException(e);
+        }
     }
 
-    // construct mapping of neighbors and initial dv table for response message
+    /**
+     * Construct mapping of neighbors and initial dv table
+     * @throws IOException if there are error while reading config file
+     */
     private void processConfigFile() throws IOException {
         BufferedReader reader = new BufferedReader(new FileReader(CONFIG_FILE_PATH));
         String line;
@@ -59,8 +73,11 @@ public class Server {
         }
     }
 
+    /**
+     * Wait for all nodes to sends JOIN message,
+     * after all nodes join, send back RESPONSE message with initial dv table
+     */
     public void accept() {
-        isConnected = true;
         // listen to 6 nodes and save its address
         while (addressMap.size() < initialTable.size()) {
             Message recvMessage = Message.recvMessage(socket);
@@ -79,10 +96,13 @@ public class Server {
         });
     }
 
+    /**
+     * Listen for UPDATE messages and forward to neighbors
+     */
     public void listen() {
         AtomicLong startTime = new AtomicLong(System.currentTimeMillis());
         Thread listenThread = new Thread(() -> {
-            while (isConnected) {
+            while (true) {
                 Message recvMessage = Message.recvMessage(socket);
                 startTime.set(System.currentTimeMillis());
 
@@ -95,24 +115,36 @@ public class Server {
             }
         });
 
+        listenThread.setDaemon(true);
         listenThread.start();
-        while (System.currentTimeMillis() - startTime.get() <= IDLE_TIME_MILLIS);
+
+        while (System.currentTimeMillis() - startTime.get() <= IDLE_TIME_MILLIS) {
+            // do nothing
+        }
+
         listenThread.interrupt();
 
         Message terminateMessage = new Message(TERMINATE, "", null);
-        Collection<String> nodeList = addressMap.keySet();
-        multicast(nodeList, terminateMessage);
+        Collection<String> allNodes = addressMap.keySet();
+        multicast(allNodes, terminateMessage);
     }
 
+    /**
+     * Sends message to specified nodes
+     * @param recipients specified nodes
+     * @param message message to send
+     */
     private void multicast(Collection<String> recipients, Message message) {
         recipients.forEach(destinationID -> {
-            message.setRouterID(destinationID);
             message.setAddress(addressMap.get(destinationID));
             Message.sendMessage(socket, message);
         });
     }
 
-    public static void run() throws IOException {
+    /**
+     * Method to start a server
+     */
+    public static void start() {
         Server server = new Server();
         // accept initial connections
         System.out.println("start accepting");
@@ -122,7 +154,7 @@ public class Server {
         server.listen();
     }
 
-    public static void main(String[] args) throws IOException {
-        Server.run();
+    public static void main(String[] args) {
+        Server.start();
     }
 }
