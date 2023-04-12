@@ -10,14 +10,15 @@ import static message.MessageType.*;
 /**
  * Server class to handle the registration of nodes and forward the messages
  */
-
 public class Server {
 
     private static final int DEFAULT_PORT = 5555;
 
     private static final String CONFIG_FILE_PATH = "src/config.txt";
 
-    private static final long IDLE_TIME_MILLIS = 3000;
+    private static final String ALTERNATIVE_CONFIG_FILE_PATH = "./config.txt";
+
+    private static final long IDLE_TIME_MILLIS = 1500;
 
     private final DatagramSocket socket;
 
@@ -42,35 +43,55 @@ public class Server {
 
     /**
      * Construct mapping of neighbors and initial dv table
-     * @throws IOException if there are error while reading config file
      */
     private void processConfigFile() throws IOException {
-        BufferedReader reader = new BufferedReader(new FileReader(CONFIG_FILE_PATH));
+        BufferedReader reader;
+
+        reader = createReader();
+
         String line;
         while ((line = reader.readLine()) != null) {
-            String[] data = line.replaceAll(":", "")
-                    .replaceAll("<", "")
-                    .replaceAll(">", "")
-                    .replaceAll(",", "")
-                    .split(" ");
-
-            String curNode = data[0];
-
-            // process a list of neighbors and initial DV table
-            List<String> neighbors = new ArrayList<>();
-            Map<String, Integer> table = new HashMap<>();
-            table.put(curNode, 0);
-            for (int i = 1; i < data.length; i += 2) {
-                String neighbor = data[i];
-                int weight = Integer.parseInt(data[i + 1]);
-
-                table.put(neighbor, weight);
-                if (weight == -1) continue;
-                neighbors.add(neighbor);
-            }
-            neighborMap.put(curNode, neighbors);
-            initialTable.put(curNode, table);
+            processDataLine(line);
         }
+
+        reader.close();
+    }
+
+    private BufferedReader createReader() throws FileNotFoundException {
+        File configFile = new File(CONFIG_FILE_PATH);
+        BufferedReader reader;
+
+        if (configFile.exists()) {
+            reader = new BufferedReader(new FileReader(CONFIG_FILE_PATH));
+        } else {
+            reader = new BufferedReader(new FileReader(ALTERNATIVE_CONFIG_FILE_PATH));
+        }
+        return reader;
+    }
+
+    private void processDataLine(String line) {
+        String[] data = line.replaceAll(":", "")
+                .replaceAll("<", "")
+                .replaceAll(">", "")
+                .replaceAll(",", "")
+                .split(" ");
+
+        String curNode = data[0];
+
+        // process a list of neighbors and initial DV table
+        List<String> neighbors = new ArrayList<>();
+        Map<String, Integer> table = new HashMap<>();
+        table.put(curNode, 0);
+        for (int i = 1; i < data.length; i += 2) {
+            String neighbor = data[i];
+            int weight = Integer.parseInt(data[i + 1]);
+
+            table.put(neighbor, weight);
+            if (weight == -1) continue;
+            neighbors.add(neighbor);
+        }
+        neighborMap.put(curNode, neighbors);
+        initialTable.put(curNode, table);
     }
 
     /**
@@ -131,8 +152,9 @@ public class Server {
 
     /**
      * Sends message to specified nodes
+     *
      * @param recipients specified nodes
-     * @param message message to send
+     * @param message    message to send
      */
     private void multicast(Collection<String> recipients, Message message) {
         recipients.forEach(destinationID -> {
@@ -147,13 +169,15 @@ public class Server {
     public static void start() {
         Server server = new Server();
         // accept initial connections
-        System.out.println("start accepting");
+        System.out.println("start accepting...");
         server.accept();
-        System.out.println("finish accepting");
+        System.out.println("---listening--");
         // listen for updates
         server.listen();
+        System.out.println("connection closed");
     }
 
+    // ------------------------------------------------------------------------------------------------------------
     public static void main(String[] args) {
         Server.start();
     }

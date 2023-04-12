@@ -85,12 +85,14 @@ public class AbstractNode {
 
             if (!tableIsChanged.get()) continue;
 
-            System.out.println(printTable());
+//            System.out.println(printTable());
 
             Message updateMessage = new Message(UPDATE, routerID, serverAddress, this.dvTable);
             Message.sendMessage(socket, updateMessage);
         }
-        System.out.println("table finalized");
+
+        System.out.println("Table finalized (format is <Node, Cost, Next Hop>):\n");
+        System.out.println(printTable());
     }
 
     public String printTable() {
@@ -99,12 +101,11 @@ public class AbstractNode {
         dvTable.entrySet()
                 .stream()
                 .sorted(Map.Entry.comparingByKey())
-                .forEach(e -> sb.append(e.getKey())
-                        .append("-").append(e.getValue())
-                        .append("-").append(nextHopMap.get(e.getKey()))
-                        .append(" "));
+                .forEach(e -> sb.append(String.format("<%s,%d,%s> ", e.getKey(), e.getValue(), nextHopMap.get(e.getKey()))));
         return sb.toString();
     }
+
+    // ------------------------------------------------------------------------------------------------------------
 
     public void run() {
         InetSocketAddress serverAddress;
