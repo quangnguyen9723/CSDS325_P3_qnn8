@@ -13,19 +13,13 @@ import static message.MessageType.*;
 public class Server {
 
     private static final int DEFAULT_PORT = 5555;
-
     private static final String CONFIG_FILE_PATH = "src/config.txt";
-
     private static final String ALTERNATIVE_CONFIG_FILE_PATH = "./config.txt";
-
     private static final long IDLE_TIME_MILLIS = 1500;
 
     private final DatagramSocket socket;
-
     private final Map<String, Map<String, Integer>> initialTable = new HashMap<>(); // maps from node to its initial DV table.
-
     private final Map<String, List<String>> neighborMap = new HashMap<>(); // maps from node to its neighbors
-
     private final Map<String, InetSocketAddress> addressMap = new HashMap<>(); // maps from node to its address
 
     /**
@@ -46,10 +40,9 @@ public class Server {
      */
     private void processConfigFile() throws IOException {
         BufferedReader reader;
-
         reader = createReader();
-
         String line;
+
         while ((line = reader.readLine()) != null) {
             processDataLine(line);
         }

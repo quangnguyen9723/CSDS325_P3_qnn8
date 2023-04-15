@@ -11,16 +11,12 @@ import static message.MessageType.*;
 public class AbstractNode {
     public static final String DEFAULT_SERVER_IP = "localhost";
     public static final int DEFAULT_SERVER_PORT = 5555;
-
     public static final int INFINITY = Integer.MAX_VALUE / 2;
 
-    private InetSocketAddress serverAddress;
-
-    private final String routerID;
-
     private final DatagramSocket socket;
+    private final String routerID;
+    private InetSocketAddress serverAddress;
     private Map<String, Integer> dvTable;
-
     private final Map<String, String> nextHopMap = new HashMap<>();
 
     public AbstractNode(String routerID) {
@@ -40,11 +36,11 @@ public class AbstractNode {
         Message.sendMessage(socket, joinMessage);
 
         Message recvMsg = Message.recvMessage(socket);
+
         boolean isResponseMessage = recvMsg.getMessageType().equals(RESPONSE);
         if (!isResponseMessage) return;
 
         this.dvTable = recvMsg.getDvTable();
-
         dvTable.forEach((nodeID, weight) -> {
             if (weight < 0) {
                 dvTable.put(nodeID, INFINITY);
@@ -55,11 +51,10 @@ public class AbstractNode {
         });
     }
 
-    public void sendFirstRound() {
+    private void sendFirstRound() {
         Message initialUpdateMessage = new Message(UPDATE, this.routerID, this.serverAddress, this.dvTable);
         Message.sendMessage(socket, initialUpdateMessage);
     }
-
 
     public void update() {
         sendFirstRound();
@@ -84,7 +79,6 @@ public class AbstractNode {
                     dvTable.put(nodeID, newWeight);
                     nextHopMap.put(nodeID, neighborID);
                 }
-
             });
 
             if (!tableIsChanged.get()) continue;
@@ -97,7 +91,7 @@ public class AbstractNode {
 
     }
 
-    public String printTable() {
+    private String printTable() {
         StringBuilder sb = new StringBuilder();
         dvTable.entrySet()
                 .stream()
