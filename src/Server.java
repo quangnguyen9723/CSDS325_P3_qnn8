@@ -129,7 +129,7 @@ public class Server {
 
                 if (!recvMessage.isType(UPDATE)) continue;
 
-                System.out.println(recvMessage.getRouterID() + " forward its table to " + neighborMap.get(recvMessage.getRouterID()) + ":" + recvMessage.getDvTable());
+                System.out.format("%s forwards to %s with table %s\n", recvMessage.getRouterID(), neighborMap.get(recvMessage.getRouterID()), recvMessage.getDvTable());
 
                 List<String> neighborList = neighborMap.get(recvMessage.getRouterID());
                 multicast(neighborList, recvMessage);

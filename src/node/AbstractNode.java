@@ -12,6 +12,8 @@ public class AbstractNode {
     public static final String DEFAULT_SERVER_IP = "localhost";
     public static final int DEFAULT_SERVER_PORT = 5555;
 
+    public static final int INFINITY = Integer.MAX_VALUE / 2;
+
     private InetSocketAddress serverAddress;
 
     private final String routerID;
@@ -45,7 +47,7 @@ public class AbstractNode {
 
         dvTable.forEach((nodeID, weight) -> {
             if (weight < 0) {
-                dvTable.put(nodeID, Integer.MAX_VALUE / 2); // simulate infinity
+                dvTable.put(nodeID, INFINITY);
                 nextHopMap.put(nodeID, null);
             } else {
                 nextHopMap.put(nodeID, nodeID);
@@ -60,6 +62,8 @@ public class AbstractNode {
 
 
     public void update() {
+        sendFirstRound();
+
         while (true) {
             Message recvMessage = Message.recvMessage(socket);
 
@@ -85,23 +89,23 @@ public class AbstractNode {
 
             if (!tableIsChanged.get()) continue;
 
-//            System.out.println(printTable());
+            System.out.println("Updated table:" + printTable());
 
             Message updateMessage = new Message(UPDATE, routerID, serverAddress, this.dvTable);
             Message.sendMessage(socket, updateMessage);
         }
 
-        System.out.println("Table finalized (format is <Node, Cost, Next Hop>):\n");
-        System.out.println(printTable());
     }
 
     public String printTable() {
         StringBuilder sb = new StringBuilder();
-        sb.append(routerID).append(": ");
         dvTable.entrySet()
                 .stream()
                 .sorted(Map.Entry.comparingByKey())
-                .forEach(e -> sb.append(String.format("<%s,%d,%s> ", e.getKey(), e.getValue(), nextHopMap.get(e.getKey()))));
+                .forEach(e -> sb.append(String.format(" <%s,%d,%s>",
+                        e.getKey(),
+                        e.getValue() == INFINITY ? -1 : e.getValue(),
+                        nextHopMap.get(e.getKey()))));
         return sb.toString();
     }
 
@@ -115,9 +119,17 @@ public class AbstractNode {
             System.out.println("error connecting to <server_ip> or <server_port>");
             throw new RuntimeException(e);
         }
+
+        System.out.println("Waiting for other nodes to join...");
+
         this.connect(serverAddress);
-        this.sendFirstRound();
+
+        System.out.println("NODE " + routerID);
+        System.out.println("FORMAT: <Node, Cost, Next Hop>");
+        System.out.println("Initial table: " + printTable() + "\n");
+
         this.update();
+        System.out.println("\nStabilized table:" + printTable());
     }
 
 }

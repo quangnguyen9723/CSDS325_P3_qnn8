@@ -1,13 +1,9 @@
 import node.*;
 
-import java.net.UnknownHostException;
-
 public class Driver {
 
     public static void start(AbstractNode node) {
-        new Thread(() -> {
-            node.run();
-        }).start();
+        new Thread(node::run).start();
     }
 
     public static void main(String[] args) {
